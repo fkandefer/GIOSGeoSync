@@ -4,16 +4,6 @@ from arcgis.gis import GIS
 from arcgis.features import Feature
 GIOS_BASE_URL = "https://api.gios.gov.pl/pjp-api/rest"
 
-with open("config.json", "r") as config_file:
-    config = json.load(config_file)
-
-ARC_GIS_URL = config["arcgis_url"]
-ARC_GIS_USERNAME = config["arcgis_username"]
-ARC_GIS_PASSWORD = config["arcgis_password"]
-LAYER_ID = config["layer_id"]
-
-
-
 # Funkcja do pobierania stacji
 def get_stations():
     response = requests.get(f"{GIOS_BASE_URL}/station/findAll")
@@ -119,6 +109,13 @@ def update_arcgis_layer(geojson, layer_id, gis):
 
 
 def main():
+    with open("./config.json", "r") as config_file:
+        config = json.load(config_file)
+
+    ARC_GIS_URL = config["arcgis_url"]
+    ARC_GIS_USERNAME = config["arcgis_username"]
+    ARC_GIS_PASSWORD = config["arcgis_password"]
+    LAYER_ID = config["layer_id"]
     # 1. Pobierz dane z API GIOŚ i wygeneruj GeoJSON
     geojson = generate_geojson()
 
