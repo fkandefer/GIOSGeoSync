@@ -1,5 +1,6 @@
 import requests
 import json
+from sys import argv
 from arcgis.gis import GIS
 from arcgis.features import Feature
 GIOS_BASE_URL = "https://api.gios.gov.pl/pjp-api/rest"
@@ -109,8 +110,7 @@ def update_arcgis_layer(geojson, layer_id, gis):
 
 
 def main():
-    with open("./config.json", "r") as config_file:
-        config = json.load(config_file)
+    config = json.loads(argv[1])
 
     ARC_GIS_URL = config["arcgis_url"]
     ARC_GIS_USERNAME = config["arcgis_username"]
