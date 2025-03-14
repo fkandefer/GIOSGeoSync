@@ -2,7 +2,7 @@ name: Run main.py every hour
 
 on:
   schedule:
-    - cron: "0 12 * * *" # Codziennie o 12:00
+    - cron: "0 */3 * * *" # Co 3 godziny
   workflow_dispatch: # Ręczne uruchomienie
 
 jobs:

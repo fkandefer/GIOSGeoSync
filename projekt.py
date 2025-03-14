@@ -93,7 +93,7 @@ def update_arcgis_layer(geojson, layer_id, gis):
             point_geometry = {"x": geometry["coordinates"][0],
                               "y": geometry["coordinates"][1],
                               "spatialReference": {"wkid": 4326}}
-            print(f"Przetwarzanie punktu: {point_geometry}")
+            # print(f"Przetwarzanie punktu: {point_geometry}")
             features.append(
                 Feature(geometry=point_geometry, attributes=feature["properties"]))
         else:
@@ -103,10 +103,10 @@ def update_arcgis_layer(geojson, layer_id, gis):
     result = layer.edit_features(deletes=None, adds=features)
 
     # Logowanie wyniku
-    if "addResults" in result:
-        print(f"Zaktualizowano warstwę {layer_id}. Dodano {len(result['addResults'])} obiektów.")
-    else:
-        print(f"Nie udało się zaktualizować warstwy {layer_id}. Wynik: {result}")
+    # if "addResults" in result:
+    #     print(f"Zaktualizowano warstwę {layer_id}. Dodano {len(result['addResults'])} obiektów.")
+    # else:
+    #     print(f"Nie udało się zaktualizować warstwy {layer_id}. Wynik: {result}")
 
 
 def main():
@@ -124,7 +124,7 @@ def main():
 
     # 3. Zaktualizuj warstwę
     update_arcgis_layer(geojson, LAYER_ID, gis)
-    print(json.dumps(geojson, indent=2))
+    # print(json.dumps(geojson, indent=2))
 
 
 if __name__ == "__main__":
