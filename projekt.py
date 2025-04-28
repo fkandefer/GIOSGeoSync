@@ -36,33 +36,38 @@ def generate_geojson():
         station_coords = (station["gegrLat"], station["gegrLon"])
 
         # Pobierz wszystkie dane stacji jako właściwości
-        properties = {key: station[key] for key in station if
-                      key not in ["gegrLat", "gegrLon"]}
-
+        properties = {key: station[key] for key in station if key not in ["gegrLat", "gegrLon"]}
         properties["stationId"] = station_id
 
         # Dodaj współrzędne geograficzne
         properties["esrignss_latitude"] = float(station_coords[0])
         properties["esrignss_longitude"] = float(station_coords[1])
 
-        # Pobierz dane z czujników
-        sensors = get_sensors(station_id)
-        for sensor in sensors:
-            param_code = sensor['param']['paramCode']
-            if param_code in ["PM10", "PM2.5", "CO"]:
+        try:
+            # Pobierz dane z czujników
+            sensors = get_sensors(station_id)
+            for sensor in sensors:
+                param_code = sensor['param']['paramCode']
+                if param_code in ["PM10", "PM2.5", "CO"]:
+                    safe_param_code = param_code.replace(".", "_")
 
-                safe_param_code = param_code.replace(".", "_")
+                    sensor_id = sensor["id"]
+                    try:
+                        data = get_sensor_data(sensor_id)
+                        values = data.get("values", [])
 
-                sensor_id = sensor["id"]
-                data = get_sensor_data(sensor_id)
-                values = data.get("values", [])
+                        # Znajdź ostatni pomiar
+                        last_measurement = next((v for v in values if v["value"] is not None), None)
+                        if last_measurement:
+                            properties[f"{safe_param_code}_value"] = last_measurement["value"]
+                            properties[f"{safe_param_code}_date"] = last_measurement["date"]
+                    except requests.exceptions.RequestException as e:
+                        print(f"Błąd pobierania danych z czujnika {sensor_id}: {e}")
+                        continue  # Przechodzimy do następnego czujnika
 
-                # Znajdź ostatni pomiar
-                last_measurement = next((v for v in values if v["value"] is not None),
-                                        None)
-                if last_measurement:
-                    properties[f"{safe_param_code}_value"] = last_measurement["value"]
-                    properties[f"{safe_param_code}_date"] = last_measurement["date"]
+        except requests.exceptions.RequestException as e:
+            print(f"Błąd pobierania czujników dla stacji {station_id}: {e}")
+            continue  # Przechodzimy do następnej stacji
 
         # Utwórz funkcję GeoJSON
         features.append({
@@ -78,6 +83,7 @@ def generate_geojson():
         "type": "FeatureCollection",
         "features": features,
     }
+
 
 
 # Funkcja do aktualizacji danych w ArcGIS Online
