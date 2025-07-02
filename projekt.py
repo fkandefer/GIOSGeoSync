@@ -3,28 +3,38 @@ import json
 from sys import argv
 from arcgis.gis import GIS
 from arcgis.features import Feature
-GIOS_BASE_URL = "https://api.gios.gov.pl/pjp-api/rest"
+
+GIOS_BASE_URL = "https://api.gios.gov.pl/pjp-api/v1/rest"
+
+# Nowe klucze zgodnie z nowym API
+STATION_ID_KEY = "Identyfikator stacji"
+LAT_KEY = "WGS84 φ N"
+LON_KEY = "WGS84 λ E"
+SENSOR_ID_KEY = "Identyfikator stanowiska"
+SENSOR_CODE_KEY = "Wskaźnik - kod"
+VALUE_KEY = "Wartość"
+DATE_KEY = "Data"
 
 # Funkcja do pobierania stacji
 def get_stations():
-    response = requests.get(f"{GIOS_BASE_URL}/station/findAll")
+    response = requests.get(f"{GIOS_BASE_URL}/station/findAll?size=500")
     response.raise_for_status()
-    return response.json()
-
+    data = response.json()
+    return data.get("Lista stacji pomiarowych", [])
 
 # Funkcja do pobierania czujników
 def get_sensors(station_id):
     response = requests.get(f"{GIOS_BASE_URL}/station/sensors/{station_id}")
     response.raise_for_status()
-    return response.json()
-
+    data = response.json()
+    return data.get("Lista stanowisk pomiarowych dla podanej stacji", [])
 
 # Funkcja do pobierania danych z czujnika
 def get_sensor_data(sensor_id):
     response = requests.get(f"{GIOS_BASE_URL}/data/getData/{sensor_id}")
     response.raise_for_status()
-    return response.json()
-
+    data = response.json()
+    return data.get("Lista danych pomiarowych", [])
 
 # Funkcja do generowania GeoJSON
 def generate_geojson():
@@ -32,59 +42,64 @@ def generate_geojson():
     features = []
 
     for station in stations:
-        station_id = station["id"]
-        station_coords = (station["gegrLat"], station["gegrLon"])
-
-        # Pobierz wszystkie dane stacji jako właściwości
-        properties = {key: station[key] for key in station if key not in ["gegrLat", "gegrLon"]}
-        properties["stationId"] = station_id
-
-        # Dodaj współrzędne geograficzne
-        properties["esrignss_latitude"] = float(station_coords[0])
-        properties["esrignss_longitude"] = float(station_coords[1])
-
+        station_id = station[STATION_ID_KEY]
         try:
-            # Pobierz dane z czujników
+            lat = float(station[LAT_KEY])
+            lon = float(station[LON_KEY])
+        except (KeyError, ValueError):
+            continue
+
+        # Przygotuj szkielet properties
+        properties = {
+            "CO_date": None,
+            "CO_value": None,
+            "PM10_date": None,
+            "PM10_value": None,
+            "PM2_5_date": None,
+            "PM2_5_value": None,
+            "esrignss_latitude": lat,
+            "esrignss_longitude": lon,
+            "OBJECTID": None,
+            "stationId": station_id,
+            "stationName": station.get("Nazwa stacji", "")
+        }
+
+        has_data = False
+        try:
             sensors = get_sensors(station_id)
             for sensor in sensors:
-                param_code = sensor['param']['paramCode']
+                param_code = sensor[SENSOR_CODE_KEY]
                 if param_code in ["PM10", "PM2.5", "CO"]:
                     safe_param_code = param_code.replace(".", "_")
-
-                    sensor_id = sensor["id"]
+                    sensor_id = sensor[SENSOR_ID_KEY]
                     try:
-                        data = get_sensor_data(sensor_id)
-                        values = data.get("values", [])
-
-                        # Znajdź ostatni pomiar
-                        last_measurement = next((v for v in values if v["value"] is not None), None)
+                        values = get_sensor_data(sensor_id)
+                        last_measurement = next((v for v in values if v[VALUE_KEY] is not None), None)
                         if last_measurement:
-                            properties[f"{safe_param_code}_value"] = last_measurement["value"]
-                            properties[f"{safe_param_code}_date"] = last_measurement["date"]
+                            properties[f"{safe_param_code}_value"] = last_measurement[VALUE_KEY]
+                            properties[f"{safe_param_code}_date"] = last_measurement[DATE_KEY]
+                            has_data = True
                     except requests.exceptions.RequestException as e:
                         print(f"Błąd pobierania danych z czujnika {sensor_id}: {e}")
-                        continue  # Przechodzimy do następnego czujnika
-
+                        continue
         except requests.exceptions.RequestException as e:
             print(f"Błąd pobierania czujników dla stacji {station_id}: {e}")
-            continue  # Przechodzimy do następnej stacji
+            continue
 
-        # Utwórz funkcję GeoJSON
-        features.append({
-            "type": "Feature",
-            "geometry": {
-                "type": "Point",
-                "coordinates": [float(station_coords[1]), float(station_coords[0])],
-            },
-            "properties": properties,
-        })
+        if has_data:
+            features.append({
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [lon, lat],
+                },
+                "properties": properties,
+            })
 
     return {
         "type": "FeatureCollection",
         "features": features,
     }
-
-
 
 # Funkcja do aktualizacji danych w ArcGIS Online
 def update_arcgis_layer(geojson, layer_id, gis):
@@ -99,7 +114,6 @@ def update_arcgis_layer(geojson, layer_id, gis):
             point_geometry = {"x": geometry["coordinates"][0],
                               "y": geometry["coordinates"][1],
                               "spatialReference": {"wkid": 4326}}
-            # print(f"Przetwarzanie punktu: {point_geometry}")
             features.append(
                 Feature(geometry=point_geometry, attributes=feature["properties"]))
         else:
@@ -116,6 +130,11 @@ def update_arcgis_layer(geojson, layer_id, gis):
 
 
 def main():
+    if len(argv) > 1 and argv[1] == "--geojson":
+        geojson = generate_geojson()
+        print(json.dumps(geojson, ensure_ascii=False, indent=2))
+        return
+
     config = json.loads(argv[1])
 
     ARC_GIS_URL = config["arcgis_url"]
