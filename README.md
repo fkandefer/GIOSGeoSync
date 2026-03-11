@@ -6,7 +6,7 @@ This repository contains a script that automatically fetches air quality data fr
 
 ## Dashboard
 
-The latest air quality data is visualized on an interactive ArcGIS dashboard:
+The latest air quality data is visualized on an interactive ArcGIS dashboard(Outdated due to changes in GIOS API):
 
 ➡️ [**Air Quality Dashboard**](https://agh-ust.maps.arcgis.com/apps/dashboards/6475cee14589421b8e38035aeb5df1ca)
 
